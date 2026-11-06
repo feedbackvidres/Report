@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<base target="_top">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Compound Variation Report</title>
@@ -9,6 +8,8 @@
 <style>
   :root{color-scheme:light}
   img{max-width:100%}
+  [hidden]{display:none!important}
+  .next .actbtn{display:inline-block;padding:10px 16px;border:0;border-radius:8px;background:var(--wa);color:var(--wa-ink);font:inherit;font-weight:700;cursor:pointer}
 
   /* Layout: one narrow column built for a phone. Navy report header, form card, 2x2 photo grid, notes, actions. */
   :root{
@@ -150,7 +151,8 @@
     <div class="next" id="next" hidden>
       <p><b>Saved.</b> A new row was added to your Google Sheet and the report image was stored in Google Drive.</p>
       <p style="display:flex;gap:10px;flex-wrap:wrap;margin:0">
-        <a id="waLink" href="https://wa.me/" target="_blank" rel="noopener noreferrer">Share on WhatsApp</a>
+        <button type="button" id="btnShareImg" class="actbtn" hidden>Share image on WhatsApp</button>
+        <a id="waLink" href="https://wa.me/" target="_blank" rel="noopener noreferrer">Send link on WhatsApp</a>
         <a id="imgLink" href="#" target="_blank" rel="noopener noreferrer" style="background:var(--navy-btn);color:var(--navy-btn-ink)">View report image</a>
       </p>
     </div>
@@ -168,6 +170,7 @@
 
 <script>
 (function(){
+  var API_URL='https://script.google.com/macros/s/AKfycbye-YKQn3DYJkDoywGQRWxFiJ94qLxX2fxTtotYiRCZIglzeo217mDQ9G-mSUeTV2k/exec';
   var $=function(id){return document.getElementById(id)};
   var LABELS=['Photo 1','Photo 2','Photo 3','Photo 4'];
   var photos=[null,null,null,null];
@@ -358,14 +361,20 @@
   }
 
   /* ---------- save to Google Sheet + Drive ---------- */
-  function hasGas(){return typeof google!=='undefined'&&google.script&&google.script.run}
+  var lastBlob=null;
+  function canShareFiles(){
+    try{
+      var f=new File([new Blob(['x'])],'a.jpg',{type:'image/jpeg'});
+      return !!(navigator.canShare&&navigator.canShare({files:[f]}));
+    }catch(e){return false}
+  }
   $('btnSave').addEventListener('click',async function(){
     var b=$('btnSave'),lbl=$('saveLbl');
-    if(!hasGas()){toast('Open this form from the Apps Script web app link to save.');return}
     b.disabled=true;lbl.textContent='Saving...';
     function done(){lbl.textContent='Save to Google Sheet';b.disabled=false}
     try{
       var cv=await buildCanvas();
+      lastBlob=await new Promise(function(r){cv.toBlob(r,'image/jpeg',0.9)});
       var payload={
         dateTime:fmtDT($('dt').value),
         company:$('company').value.trim(),
@@ -375,18 +384,27 @@
         description:$('desc').value.trim(),
         image:cv.toDataURL('image/jpeg',0.9).split(',')[1]
       };
-      google.script.run
-        .withSuccessHandler(function(r){
-          imageUrl=(r&&r.url)||'';refreshLinks();
-          $('imgLink').href=imageUrl||'#';$('next').hidden=false;
-          done();toast('Saved to Google Sheet.');
-          $('next').scrollIntoView({block:'nearest'});
-        })
-        .withFailureHandler(function(err){
-          done();toast('Could not save: '+((err&&err.message)||'please try again'));
-        })
-        .saveReport(payload);
-    }catch(e){done();toast('Something went wrong. Please try again.')}
+      var res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+      var out=await res.json();
+      if(!out.ok)throw new Error(out.error||'Save failed');
+      imageUrl=out.url||'';refreshLinks();
+      $('imgLink').href=imageUrl||'#';
+      $('btnShareImg').hidden=!canShareFiles();
+      $('next').hidden=false;
+      done();toast('Saved to Google Sheet.');
+      $('next').scrollIntoView({block:'nearest'});
+    }catch(e){
+      done();toast('Could not save: '+((e&&e.message)||'check your internet and try again'));
+    }
+  });
+  $('btnShareImg').addEventListener('click',async function(){
+    if(!lastBlob)return;
+    try{
+      var file=new File([lastBlob],fname(),{type:'image/jpeg'});
+      await navigator.share({files:[file],text:buildMsg()});
+    }catch(e){
+      if(e&&e.name!=='AbortError')toast('Sharing is not available here. Use the link button.');
+    }
   });
 
   /* ---------- reset (two taps, no dialogs) ---------- */
@@ -402,7 +420,7 @@
     ['company','compound','batch','inspector','desc'].forEach(function(id){$(id).value=''});
     $('dt').value=nowLocal();
     for(var i=0;i<4;i++){photos[i]=null;render(i)}
-    imageUrl='';$('next').hidden=true;refreshLinks();window.scrollTo(0,0);toast('New report ready.');
+    imageUrl='';lastBlob=null;$('next').hidden=true;refreshLinks();window.scrollTo(0,0);toast('New report ready.');
   });
 })();
 </script>
