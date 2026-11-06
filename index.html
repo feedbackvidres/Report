@@ -223,7 +223,7 @@
   function refreshLinks(){
     var base=buildMsg();
     $('waText').href='https://wa.me/?text='+encodeURIComponent(base);
-    $('waLink').href='https://wa.me/?text='+encodeURIComponent(base+(imageUrl?'\n\n*Report image:* '+imageUrl:''));
+    $('waLink').href='https://wa.me/?text='+encodeURIComponent(base+(imageUrl?'\n\n*Google Drive link:* '+imageUrl:''));
   }
   function onEdit(){
     if(imageUrl){imageUrl='';$('next').hidden=true}
@@ -418,7 +418,7 @@
       var res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
       var out=await res.json();
       if(!out.ok)throw new Error(out.error||'Save failed');
-      imageUrl=link;refreshLinks();
+      imageUrl=out.url||link;refreshLinks();
       $('imgLink').href=imageUrl||'#';
       $('btnShareImg').hidden=!canShareFiles();
       $('next').hidden=false;
@@ -432,7 +432,7 @@
     if(!lastBlob)return;
     try{
       var file=new File([lastBlob],fname(),{type:'image/jpeg'});
-      await navigator.share({files:[file],text:buildMsg()+(imageUrl?'\n\n*Report image link:* '+imageUrl:'')});
+      await navigator.share({files:[file],text:buildMsg()+(imageUrl?'\n\n*Google Drive link:* '+imageUrl:'')});
     }catch(e){
       if(e&&e.name!=='AbortError')toast('Sharing is not available here. Use the link button.');
     }
