@@ -6,7 +6,6 @@
 <title>Compound Variation Report</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap">
 <style>
-[hidden]{display:none!important}
   :root{color-scheme:light}
   img{max-width:100%}
   [hidden]{display:none!important}
@@ -402,7 +401,7 @@
     if(!lastBlob)return;
     try{
       var file=new File([lastBlob],fname(),{type:'image/jpeg'});
-      await navigator.share({files:[file],text:buildMsg()});
+      await navigator.share({files:[file],text:buildMsg()+(imageUrl?'\n\n*Report image link:* '+imageUrl:'')});
     }catch(e){
       if(e&&e.name!=='AbortError')toast('Sharing is not available here. Use the link button.');
     }
